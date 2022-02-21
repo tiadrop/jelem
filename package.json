@@ -1,0 +1,11 @@
+{
+  "name": "jelem",
+  "version": "0.4.0",
+  "description": "dom layer",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Aleta Lovelace",
+  "license": "MIT"
+}
