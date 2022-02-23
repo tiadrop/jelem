@@ -43,6 +43,150 @@ const contactForm = $.form({
 $(document.body).append(contactForm);
 ```
 
+## Jel.dom
+
+```js
+const $ = Jel.dom;
+
+// Jel.dom.TAG() creates an element of type TAG.
+
+// create a h1 element
+const heading = $.h1("Hello world");
+// create a form element
+const myForm = $.form({
+	// containing said h1 and a button
+	content: [
+		heading,
+		$.button("Click me")
+	]
+});
+
+// wrap an existing HTMLElement
+let thing = Jel.dom(document.getElementById("thing"));
+// query the document by selector and wrap the first matching element
+let myChild = Jel.dom(".my-container .my-child");
+// create an element using a tag string
+let link = Jel.dom("<a href='/'>click here</a>");
+// to reliably convert HTML to Jel (where the first character might not be '<') use Jel.parseHtml("...")
+```
+
+## Element Factory Options
+
+```js
+const ui = $.div({
+	classes: ["ui", "visible"],
+	// or
+	classes: "ui visible",
+	// or
+	classes: {
+		ui: true,
+		visible: isUiVisible
+	},
+	// or mix'n'match:
+	classes: [
+		"ui",
+		{
+			visible: isUiVisible
+		}
+	],
+	content: "Hello world", // xss-safe; string content is rendered as text
+	// or
+	content: $.span("hello world"), // string/array param is used as content
+	// or mix'n'match
+	content: [
+		"hello ",
+		[
+			$.span("world")
+		],
+		$.ul(posts.map(post => $.li(
+			$.a({
+				content: post.title,
+				attribs: { href=post.url }
+			})
+		)))
+	],
+	// html is unsafe, make sure you trust the source yadda yadda
+	html: "<p>hi there</p>",
+	style: {
+		opacity: 0.5,
+		cursor: "busy",
+		// filter_* and transform_* let us set (and animate) individual filters and transforms without having to keep track of the others. if chaining is required, use `filter` and `transform` as normal
+		filter_blur: "5px",
+		transform_rotateZ: "15deg",
+	},
+	attribs: {
+		tabindex: 5
+	},
+	events: {
+		click: e => alert("You clicked the div!"),
+		mouseenter: e => console.log("You entered the div!"),
+	}
+});
+```
+
+## Element Interface
+
+```js
+// traditional
+const rawDiv = document.createElement("div");
+rawDiv.innerText = "hello world";
+// Jel
+const wrappedDiv = $.div("world world");
+
+ui.classes.add("my-class");
+ui.classes.toggle("my-class");
+ui.classes = ["ui", "visible"];
+ui.classes.toggle("errors", formErrors.length > 0);
+
+const body = $(document.body);
+body.append(wrappedDiv); // append a Jel
+body.append("hello world"); // append a text node
+body.append(rawDiv); // append an HTMLElement
+body.append([rawDiv, wrappedDiv, null, "hello world"]); // append an array
+// (falsy items are ignored, for easy mapping and conditional elements)
+
+let areWrappersCached = body === $(document.body); // true
+
+ui.on("click", handleClickEvent);
+
+// qsa returns an array of (Jel-wrapped) elements
+let anchors = $(body).qsa("footer a");
+anchors.forEach(a => a.attribs.rel = "noopener");
+```
+
+## IDs
+
+ID in an element spec does not produce an `id` attribute. It creates a reference to the element, accessible via the parent.
+
+```js
+const ui = $.div({
+	classes: "ui",
+	content: [
+		$.input({
+			id: "nameInput",
+		}),
+		$.button({
+			content: "Greet me",
+			events: {
+				click: () => {
+					alert(ui.$nameInput.value); // <- ids produce parent.$<id>
+				}
+			}
+		})
+	]
+});
+```
+
+To produce an `id` attribute, use `attribs`:
+
+```js
+const ui = $.div({
+	attribs: {
+		id: "main-ui",
+	}
+});
+```
+
 ## Use Components
 
 ```js
@@ -101,7 +245,7 @@ $(document.body).append($.form([
 
 ```
 
-More comprehensive components can take the form `(spec, define, trigger) => HTMLElement|Jel` and, via `Jel.factory()`, create components with an interface consistent with other Jel elements. Use `define()` to define properties on the created component object and `trigger` to fire an event.
+More comprehensive components can take the form `(spec, define, trigger) => HTMLElement|Jel` and, via `Jel.factory()`, create components with an interface consistent with other Jel elements. Use `define()` to define properties on the created component object and `trigger()` to fire an event.
 
 ```js
 const labeledInput = (spec, define, trigger) => {
@@ -132,138 +276,17 @@ const labeledInput = (spec, define, trigger) => {
 	return main;
 };
 
-```
-
-See [jel-slidebar.js](/src/jel-slidebar.js) for a fuller example.
-
-## Jel.dom
-
-```js
-const $ = Jel.dom;
-
-// Jel.dom.TAG() creates an element of type TAG.
-
-// create a h1 element
-const heading = $.h1("Hello world");
-// create a form element
-const myForm = $.form({
-	// containing said h1 and a button
-	content: [
-		heading,
-		$.button("Click me")
-	]
+const j = Jel.factory({
+	labeledInput
 });
-
-let thing = Jel.dom(document.getElementById("thing")); // wraps an existing HTMLElement
-let myChild = Jel.dom(".my-container .my-child"); // queries the document by selector and wraps the first matching element
-let link = Jel.dom("<a href='/'>click here</a>"); // creates the described element.
-// to reliably convert HTML to Jel (where the first character might not be '<') use Jel.parseHTML("...")
-```
-
-## Element Factory Options
-
-```js
-const ui = $.div({
-	classes: ["ui", "visible"],
-	// or
-	classes: "ui visible",
-	// or
-	classes: {
-		ui: true,
-		visible: isUiVisible
-	},
-	// or mix'n'match:
-	classes: [
-		"ui",
-		{
-			visible: isUiVisible
-		}
-	],
-	content: "Hello world", // xss-safe; string content is rendered as text
-	// or
-	content: $.span("hello world"), // string/array param is used as content
-	// or mix'n'match
-	content: [
-		"hello ",
-		[
-			$.span("world")
-		]
-	],
-	// html is unsafe, make sure you trust the source yadda yadda
-	html: "<p>hi there</p>",
-	style: {
-		opacity: 0.5,
-		cursor: "busy",
-		// filter_* and transform_* let us set (and animate) individual filters and transforms without having to keep track of the others. if chaining is required, use `filter` and `transform` as normal
-		filter_blur: "5px",
-		transform_rotateZ: "15deg",
-	},
-	attribs: {
-		tabindex: 5
-	},
+const myLabeledInput = j.labeledInput({
+	caption: "Username",
 	events: {
-		click: e => alert("You clicked the div!"),
-		mouseenter: e => console.log("You entered the div!"),
+		change: e => { ... }
 	}
 });
+
 ```
 
-## Element Interface
+See [jel-slidebar.js](https://github.com/thecynicslantern/jelem/blob/master/src/jel-slidebar.js) for a fuller example.
 
-```js
-const rawDiv = document.createElement("div");
-rawDiv.innerText = "hello world";
-const wrappedDiv = $.div("world world");
-
-ui.classes.add("my-class");
-ui.classes.toggle("my-class");
-ui.classes = ["ui", "visible"];
-ui.classes.toggle("errors", formErrors.length > 0);
-
-const body = $(document.body);
-body.append(wrappedDiv); // append a Jel
-body.append("hello world"); // append a text node
-body.append(rawDiv); // append an HTMLElement
-body.append([rawDiv, wrappedDiv, "hello world"]); // append an array
-
-let areWrappersCached = body === $(document.body); // true
-
-ui.on("click", handleClickEvent);
-
-// qsa returns an array of (Jel-wrapped) elements
-let anchors = $(body).qsa("footer a");
-anchors.forEach(a => a.attribs.rel = "noopener");
-```
-
-## IDs
-
-ID in an element spec does not produce an `id` attribute. It creates a reference to the element, accessible via the parent.
-
-```js
-const ui = $.div({
-	classes: "ui",
-	content: [
-		$.input({
-			id: "nameInput",
-		}),
-		$.button({
-			content: "Greet me",
-			events: {
-				click: () => {
-					alert(ui.$nameInput.value); // <- ids produce parent.$<id>
-				}
-			}
-		})
-	]
-});
-```
-
-To produce an `id` attribute, use `attribs`:
-
-```js
-const ui = $.div({
-	attribs: {
-		id: "main-ui",
-	}
-});
-```

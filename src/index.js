@@ -11,22 +11,26 @@ const Jel = function Jel(type, spec = {}) {
 	const triggerEvent = (name, data) => {
 		if (eventHandlers[name]) eventHandlers[name].forEach(h => h(data));
 	};
-
+	
 	const define = props => Object.defineProperties(this, props);
-	define.values = vals => {
-		Object.keys(vals).forEach(k => Object.defineProperty(this, k, { value: vals[k] }));
+	define.values = values => {
+		Object.keys(values).forEach(k => Object.defineProperty(this, k, { value: values[k] }));
 	};
-	define.readOnly = vals => {
-		Object.keys(vals).forEach(k => Object.defineProperty(this, k, { get: vals[k] }));
+	/**
+	 * @param {Object.<string, () => any>} values
+	 */
+	 define.readOnly = values => {
+		Object.keys(values).forEach(k => Object.defineProperty(this, k, { get: values[k] }));
 	};
-	define.writeOnly = vals => {
-		Object.keys(vals).forEach(k => Object.defineProperty(this, k, { set: vals[k] }));
+	/**
+	 * @param {Object.<string, (string) => void>} values
+	 */
+	 define.writeOnly = values => {
+		Object.keys(values).forEach(k => Object.defineProperty(this, k, { set: values[k] }));
 	};
 	define.importDom = (ent) => {
 		["absoluteTop", "absoluteLeft", "style", "attribs", "data", "qsa"].forEach(k => Object.defineProperty(this, k, {
-			get: () => {
-				return ent[k];
-			}
+			get: () => ent[k]
 		}))
 	}
 
@@ -34,7 +38,9 @@ const Jel = function Jel(type, spec = {}) {
 	// (the jel-constructor) will return this component's root HTMLElement (or Jel that represents it)
 	const domRoot = type(spec, define, triggerEvent);
 
-	this.entityType = type.name;
+	define.readOnly({
+		entityType: () => type.name
+	});
 
 	let domElement;
 	if (domRoot instanceof Jel) {
@@ -84,6 +90,11 @@ const Jel = function Jel(type, spec = {}) {
 	});
 };
 
+/**
+ * 
+ * @param {HTMLNode} node 
+ * @returns {Jel} wrapped element
+ */
 const wrapHTMLElement = node => {
 	if (typeof node == "string") node = document.querySelector(node);
 	if (!(node instanceof HTMLElement)) throw new Error("Expecting HTMLElement");
@@ -97,6 +108,11 @@ const wrapHTMLElement = node => {
 	return elementWrapperCache.get(node);
 };
 
+/**
+ * 
+ * @param {string} html 
+ * @returns {(Jel|Text)[]}
+ */
 const parseHtml = html => {
 	const result = [];
 	const tempElement = document.createElement("div");
@@ -186,6 +202,7 @@ const wrapStyles = element => {
 const flattenClasses = source => {
 	let classes = [];
 	const addClasses = (source) => {
+		if (!source) return; // ignore falsy items
 		if (typeof source == "string") {
 			source.trim().split(/\s+/).forEach(s => classes.push(s));
 		} else if (Array.isArray(source)){
@@ -194,15 +211,13 @@ const flattenClasses = source => {
 		} else if (typeof source == "object"){
 			// { myclass: bool }
 			addClasses(Object.keys(source).filter(k => source[k]));
-		} else if(!source){
-			// ignore falsy items
 		}	else throw new Error("Invalid type for 'classes': " + typeof source);
 	}
 	addClasses(source);
 	return classes;
 };
 
-// elem constructors define entity props and return the domElement they created
+// elem constructors define entity props and return the domElement they create
 const elementWrapper = (spec, define) => {
 	spec = { ...spec };
 
@@ -295,12 +310,11 @@ const elementWrapper = (spec, define) => {
 				// new id; create accessor
 				define({
 					["$" + item.id]: {
-						get: () => childById[item.id], enumerable: true,
+						get: () => item, enumerable: true,
 						configurable: true,
 					}
 				});
 			}
-			childById[item.id] = item;
 		}
 
 		append(item.domElement);
@@ -367,7 +381,7 @@ const elementWrapper = (spec, define) => {
 				if (!(entityToRemove instanceof Jel) && !(entityToRemove instanceof Text)) throw new Error("Invalid type");
 				element.removeChild(elementToRemove);
 				if (entityToRemove instanceof Jel && entityToRemove.id) {
-					delete childById[entityToRemove.id];
+					delete this["$" + entityToRemove.id];
 				}
 			}
 		},
@@ -389,11 +403,26 @@ const elementWrapper = (spec, define) => {
 	return element;
 };
 
-const domFunc = source => {
+/**
+ * Wraps or creates an element from selector or tag string.
+ * 
+ * eg. `"<a href='/'>hello</a>"`
+ * 
+ * or  `"a.my-class"`
+ * 
+ * or `document.getElementById("teapot")`
+ * @param {string|HTMLElement} source
+ * @returns {Jel} the Jel-wrapped element
+ * @property {string} flap
+ */
+ function domFunc(source){
 	if (source instanceof HTMLElement) return wrapHTMLElement(source);
 	if (typeof source == "string") {
 		if (source[0] === "<") {
-			return parseHtml(source)[0];
+			const nodes = parseHtml(source);
+			if(nodes.length !== 1) throw new Error("Jel.dom('<...') should describe exactly one element; consider using " + Jel.name + ".parseHtml()");
+			// remove temptation to use dom(str) to parse general html (Jel.parseHtml should be used instead)
+			return nodes[0];
 		} else {
 			return wrapHTMLElement(document.querySelector(source));
 		}
@@ -402,26 +431,27 @@ const domFunc = source => {
 	}
 };
 
-const createFactory = (entityTypes = {}) => {
-	let customTypes = {};
+function JelFactory(entityTypes){
 	Object.keys(entityTypes).forEach(k => {
-		customTypes[k] = spec => {
+		this[k] = spec => {
 			return new Jel(entityTypes[k], spec);
 		}
 	});
+}
 
-	return customTypes;
+
+Jel.factory = (entityTypes = {}) => {
+	return new JelFactory(entityTypes);
 };
 
-Jel.factory = createFactory;
-Jel.dom =  new Proxy(() => { }, {
-	apply: (o, _, args) => domFunc(...args),
-	get: (o, k) => {
-		return (spec = {}) => {
-			if (typeof spec == "string" || Array.isArray(spec)){
-				spec = { content: spec };	
+Jel.dom = new Proxy(domFunc, {
+	apply: (o, _, args) => o(...args),
+	get: (_, tag) => {
+		return (specOrContent = {}, specIfContent = {}) => {
+			if (typeof specOrContent == "string" || Array.isArray(specOrContent)){
+				specOrContent = { content: [specOrContent.content, specIfContent.content] };
 			}
-			return new Jel(elementWrapper, { ...spec, tag: k });
+			return new Jel(elementWrapper, { ...specOrContent, tag });
 		}
 	}
 });

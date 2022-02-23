@@ -1,8 +1,9 @@
 {
   "name": "jelem",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "dom layer",
   "main": "index.js",
+  "repository": "github:thecynicslantern/jelem",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

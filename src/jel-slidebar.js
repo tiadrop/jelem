@@ -65,7 +65,7 @@ module.exports = function slidebar(spec, define, trigger){
 		]
 	});
 
-	// id in spec does not produce id attributes. instead it creates element.$<id>
+	// id in spec does not produce id attributes. instead it creates parent.$<id>
 	// (jel components should generally be self-contained and not reference elements by dom id)
 	// (to produce an id attribute use $.div({attribs: {id: "hello"}}))
 	const inner = outer.$inner;
