@@ -33,9 +33,9 @@ const contactForm = $.form({
 		$.textarea({ name: "body", }),
 		$.input({
 			attribs: {
-				type: "sumbit",
+				type: "submit",
+				value: "Send"
 			},
-			content: "Send"
 		})
 	]
 });
@@ -101,7 +101,7 @@ const ui = $.div({
 		$.ul(posts.map(post => $.li(
 			$.a({
 				content: post.title,
-				attribs: { href=post.url }
+				attribs: { href: post.url }
 			})
 		)))
 	],
