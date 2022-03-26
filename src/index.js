@@ -127,7 +127,7 @@ const parseHtml = html => {
 };
 
 const attributesAccessorHandler = {
-	get: (o, k) => o.getAttribute(k),
+	get: (o, k) => o.getAttribute(String(k)),
 	set: (o, k, v) => {
 		o.setAttribute(k, v);
 		return true;
@@ -142,7 +142,7 @@ const attributesAccessorHandler = {
 };
 
 const dataAttributesAccessorHandler = {
-	get: (o, k) => o.getAttribute("data-" + k),
+	get: (o, k) => o.getAttribute("data-" + String(k)),
 	set: (o, k, v) => {
 		o.setAttribute("data-" + k, v);
 		return true;
@@ -182,6 +182,7 @@ const styleAccessorHandler = {
 		return true;
 	},
 	get: (o, k) => {
+		if (typeof k == "symbol") return o.element.style[k];
 		let match;
 		if (match = k.match(/^filter_(\w+)$/)) {
 			return o.filters[match[1]];
@@ -448,8 +449,13 @@ Jel.dom = new Proxy(domFunc, {
 	apply: (o, _, args) => o(...args),
 	get: (_, tag) => {
 		return (specOrContent = {}, specIfContent = {}) => {
-			if (typeof specOrContent == "string" || Array.isArray(specOrContent)){
-				specOrContent = { content: [specOrContent.content, specIfContent.content] };
+			if (
+				typeof specOrContent == "string"
+				|| Array.isArray(specOrContent)
+				|| specOrContent instanceof Jel
+				|| specOrContent instanceof Node
+			){
+				specOrContent = { content: specOrContent, ...specIfContent };
 			}
 			return new Jel(elementWrapper, { ...specOrContent, tag });
 		}
